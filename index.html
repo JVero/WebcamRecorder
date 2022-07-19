@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Video capture tool</title>
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <header>
+        <h1>Video capture tool</h1>
+    </header>
+    <main>
+        <p>Note: none of the data captured here is ever transmitted. Everything is kept local on the browser, and none of your information is being shared through this website</p>
+        <p><button id="btnStart">START RECORDING</button><br/>
+        <button id="btnStop">STOP RECORDING</button></p>
+        <strong><p id="formReminder">To enable recording, scan your participant code or enter it manually in the form below</p></strong>
+
+        <form id="participantInfo">
+            <p>Participant ID</p><input id="participantID" name="participantID" type="text" oninput="
+                document.getElementById('btnStart').disabled = ((this.value == '') || (document.getElementById('task').value == ''));
+                document.getElementById('btnStop').disabled = ((this.value == '') || (document.getElementById('task').value == ''));
+                document.getElementById('formReminder').hidden = true
+                "><br>
+            <p>Task</p><input id="task" name="task" type="text" oninput="
+            document.getElementById('btnStart').disabled = ((this.value == '') || (document.getElementById('participantID').value == ''));
+            document.getElementById('btnStop').disabled = ((this.value == '') || (document.getElementById('participantID').value == ''));
+            document.getElementById('formReminder').hidden = true"><br>
+            </form>
+<script>
+let barcodeDetector = new BarcodeDetector({'formats': ['qr_code']});
+
+window.onload = function () {
+    let start = document.getElementById('btnStart')
+    let stop = document.getElementById('btnStop');
+    start.disabled = true
+    stop.disabled = true
+}
+</script>
+        <video id="vid1" controls></video>
+
+        <video id="vid2" controls>
+            
+        </video>
+
+        <a id="btnSave" download>Download the video</a> file. 
+        <!-- <button id="btnSave">SAVE VIDEO</button><br/> -->
+        <!-- could save to canvas and do image manipulation and saving too -->
+    </main>    
+    <script>
+
+        let constraintObj = { 
+            audio: true, 
+            video: { 
+                facingMode: "user", 
+                width: { min: 640, ideal: 1280, max: 1920 },
+                height: { min: 480, ideal: 720, max: 1080 } 
+            } 
+        }; 
+        // width: 1280, height: 720  -- preference only
+        // facingMode: {exact: "user"}
+        // facingMode: "environment"
+        
+        //handle older browsers that might implement getUserMedia in some way
+        if (navigator.mediaDevices === undefined) {
+            navigator.mediaDevices = {};
+            navigator.mediaDevices.getUserMedia = function(constraintObj) {
+                let getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+                if (!getUserMedia) {
+                    return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
+                }
+                return new Promise(function(resolve, reject) {
+                    getUserMedia.call(navigator, constraintObj, resolve, reject);
+                });
+            }
+        }else{
+            navigator.mediaDevices.enumerateDevices()
+            .then(devices => {
+                devices.forEach(device=>{
+                    console.log(device.kind.toUpperCase(), device.label);
+                    //, device.deviceId
+                })
+            })
+            .catch(err=>{
+                console.log(err.name, err.message);
+            })
+        }
+
+        navigator.mediaDevices.getUserMedia(constraintObj)
+        .then(function(mediaStreamObj) {
+            //connect the media stream to the first video element
+            let video = document.querySelector('video');
+            if ("srcObject" in video) {
+                video.srcObject = mediaStreamObj;
+            } else {
+                //old version
+                video.src = window.URL.createObjectURL(mediaStreamObj);
+            }
+            
+            video.onloadedmetadata = function(ev) {
+                //show in the video element what is being captured by the webcam
+                video.play();
+            };
+            
+
+            //add listeners for saving video/audio
+            let start = document.getElementById('btnStart');
+            let stop = document.getElementById('btnStop');
+            let vidStream = document.getElementById('vid1');
+            let vidSave = document.getElementById('vid2');
+            let save = document.getElementById('btnSave');
+            
+            let mediaRecorder = new MediaRecorder(mediaStreamObj);
+            let chunks = [];
+            
+            start.addEventListener('click', (ev)=>{
+                mediaRecorder.start();
+                console.log(mediaRecorder.state);
+            })
+            stop.addEventListener('click', (ev)=>{
+                mediaRecorder.stop();
+                console.log(mediaRecorder.state);
+            });
+            mediaRecorder.ondataavailable = function(ev) {
+                console.log('data')
+                chunks.push(ev.data);
+            }
+
+            const detectCode = () => {
+                barcodeDetector.detect(video).then(codes => {
+                    if (codes.length == 0) {
+                        return;
+                    }
+                    console.log("Code found!")
+                    console.log(codes) 
+                    // console.log(codes[0].rawValue)
+                    document.getElementById('participantID').value = codes[0].rawValue
+                    document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnStop').disabled = false;
+                }).catch(err => {
+                    console.log('error', err)
+                })
+                
+            }
+            let scanInterval = setInterval(detectCode, 1000)
+            
+            mediaRecorder.onstop = (ev)=>{
+                let blob = new Blob(chunks, { 'type' : 'video/mp4;' });
+                chunks = [];
+
+                const createFilename = () => {
+                    const d = new Date()
+                   const pID = document.getElementById("participantID").value
+                   const task = document.getElementById("task").value
+                    const month = d.getUTCMonth() + 1
+                    const day = d.getDate()
+                    const year = d.getUTCFullYear()
+                   const hour = d.getHours()
+                   const minute = d.getMinutes()
+
+                   return `${pID}_${task}_${year}_${month}_${day}_${hour}_${minute}`
+                }
+
+                vidSave.download = "sample.mp4"
+                let videoURL = window.URL.createObjectURL(blob);
+                vidSave.src = videoURL;
+                save.href = videoURL
+                save.download = createFilename()
+                save.click()
+            }
+        })
+        .catch(function(err) { 
+            console.log(err.name, err.message); 
+        });
+        
+        /*********************************
+        getUserMedia returns a Promise
+        resolve - returns a MediaStream Object
+        reject returns one of the following errors
+        AbortError - generic unknown cause
+        NotAllowedError (SecurityError) - user rejected permissions
+        NotFoundError - missing media track
+        NotReadableError - user permissions given but hardware/OS error
+        OverconstrainedError - constraint video settings preventing
+        TypeError - audio: false, video: false
+        *********************************/
+    </script>
+</body>
+</html>
