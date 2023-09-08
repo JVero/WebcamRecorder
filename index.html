@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Video capture tool</title>
     <meta name="viewport" content="width=device-width">
-    <link rel="stylesheet" href="main.css">
+    <!-- <link rel="stylesheet" href="main.css"> -->
 </head>
 <body>
     <header>
@@ -28,9 +28,15 @@
                  }
              });
          });
+         console.log("Cameras populated")
+
      }
+     navigator.mediaDevices.getUserMedia({video: true}).then(() => {
     getVideoDevices();
+     })
+    //  getVideoDevices();
  </script>
+ <br>
  <button id="btnStart">START RECORDING</button><br/>
 
         <button id="btnStop">STOP RECORDING</button></p>
@@ -192,7 +198,27 @@ window.onload = function () {
         .catch(function(err) { 
             console.log(err.name, err.message); 
         });
-        
+        document.getElementById("videoDevice").addEventListener("change", function() {
+    var videoElement = document.getElementById("vid1");
+    
+    // Stop the current video stream if it exists.
+    if (videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
+    // Request the video stream from the selected camera.
+    var selectedDeviceId = this.value;
+    navigator.mediaDevices.getUserMedia({
+        video: {
+            deviceId: selectedDeviceId
+        }
+    }).then(function(stream) {
+        videoElement.srcObject = stream;
+    }).catch(function(error) {
+        console.error("Error accessing the camera:", error);
+    });
+});
+
         /*********************************
         getUserMedia returns a Promise
         resolve - returns a MediaStream Object
