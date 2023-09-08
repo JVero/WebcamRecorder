@@ -12,7 +12,27 @@
     </header>
     <main>
         <p>Note: none of the data captured here is ever transmitted. Everything is kept local on the browser, and none of your information is being shared through this website</p>
-        <p><button id="btnStart">START RECORDING</button><br/>
+       <p>
+ <select id="videoDevice"></select>
+ <script>
+     // Function to populate video devices
+     function getVideoDevices() {
+         navigator.mediaDevices.enumerateDevices().then(function(devices) {
+             var videoDeviceDropdown = document.getElementById("videoDevice");
+             devices.forEach(function(device) {
+                 if(device.kind === 'videoinput') {
+                     var option = document.createElement('option');
+                     option.value = device.deviceId;
+                     option.text = device.label || 'Camera ' + (videoDeviceDropdown.length + 1);
+                     videoDeviceDropdown.appendChild(option);
+                 }
+             });
+         });
+     }
+    getVideoDevices();
+ </script>
+ <button id="btnStart">START RECORDING</button><br/>
+
         <button id="btnStop">STOP RECORDING</button></p>
         <strong><p id="formReminder">To enable recording, scan your participant code or enter it manually in the form below</p></strong>
 
@@ -37,9 +57,9 @@ window.onload = function () {
     stop.disabled = true
 }
 </script>
-        <video id="vid1" controls></video>
+        <video muted id="vid1" controls></video>
 
-        <video id="vid2" controls>
+        <video muted id="vid2" controls>
             
         </video>
 
